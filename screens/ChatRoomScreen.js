@@ -42,6 +42,10 @@ export default function ChatRoomScreen({ route, navigation }) {
             setUsers(userList);
         });
 
+        socket.on("chat-history", (history) => {
+            setMessages(history);
+        });
+
         socket.on("new-message", (msg) => {
             setMessages((prev) => [...prev, msg]);
         });

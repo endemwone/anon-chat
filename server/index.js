@@ -2,13 +2,14 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
+const { initDb, saveMessage, getRoomHistory } = require("./database");
 
 const app = express();
 app.use(cors());
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
+    cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
 // ── In-memory data ──────────────────────────────────────────
@@ -19,77 +20,90 @@ const socketToRoom = new Map();
 
 // Helper: get the user list for a room
 function getUserList(roomCode) {
-  const members = rooms.get(roomCode);
-  if (!members) return [];
-  return Array.from(members.values());
+    const members = rooms.get(roomCode);
+    if (!members) return [];
+    return Array.from(members.values());
 }
 
 // ── Socket.io events ────────────────────────────────────────
 io.on("connection", (socket) => {
-  console.log(`⚡  Connected: ${socket.id}`);
+    console.log(`⚡  Connected: ${socket.id}`);
 
-  // ── Join a room ──
-  socket.on("join-room", ({ displayName, roomCode }) => {
-    if (!displayName || !roomCode) return;
+    // ── Join a room ──
+    socket.on("join-room", ({ displayName, roomCode }) => {
+        if (!displayName || !roomCode) return;
 
-    // Create the room if it doesn't exist
-    if (!rooms.has(roomCode)) {
-      rooms.set(roomCode, new Map());
-    }
+        // Create the room if it doesn't exist
+        if (!rooms.has(roomCode)) {
+            rooms.set(roomCode, new Map());
+        }
 
-    rooms.get(roomCode).set(socket.id, displayName);
-    socketToRoom.set(socket.id, roomCode);
-    socket.join(roomCode);
+        rooms.get(roomCode).set(socket.id, displayName);
+        socketToRoom.set(socket.id, roomCode);
+        socket.join(roomCode);
 
-    console.log(`👤  ${displayName} joined room [${roomCode}]`);
+        console.log(`👤  ${displayName} joined room [${roomCode}]`);
 
-    // Broadcast updated user list to everyone in the room
-    io.to(roomCode).emit("room-users", getUserList(roomCode));
-  });
-
-  // ── Receive a message — strip identity, broadcast anonymously ──
-  socket.on("send-message", ({ text }) => {
-    const roomCode = socketToRoom.get(socket.id);
-    if (!roomCode || !text) return;
-
-    const message = {
-      text: text.trim(),
-      timestamp: new Date().toISOString(),
-    };
-
-    console.log(`💬  Anonymous message in [${roomCode}]: ${message.text}`);
-
-    // Send to everyone in the room (including sender)
-    io.to(roomCode).emit("new-message", message);
-  });
-
-  // ── Disconnect — clean up ──
-  socket.on("disconnect", () => {
-    const roomCode = socketToRoom.get(socket.id);
-
-    if (roomCode && rooms.has(roomCode)) {
-      const displayName = rooms.get(roomCode).get(socket.id);
-      rooms.get(roomCode).delete(socket.id);
-
-      // Remove empty rooms
-      if (rooms.get(roomCode).size === 0) {
-        rooms.delete(roomCode);
-        console.log(`🗑️   Room [${roomCode}] deleted (empty)`);
-      } else {
-        // Broadcast updated user list
+        // Broadcast updated user list to everyone in the room
         io.to(roomCode).emit("room-users", getUserList(roomCode));
-      }
 
-      console.log(`👋  ${displayName || socket.id} left room [${roomCode}]`);
-    }
+        // Send chat history to the joining user
+        getRoomHistory(roomCode)
+            .then((history) => {
+                socket.emit("chat-history", history);
+            })
+            .catch((err) => console.error("Error fetching history:", err));
+    });
 
-    socketToRoom.delete(socket.id);
-    console.log(`❌  Disconnected: ${socket.id}`);
-  });
+    // ── Receive a message — strip identity, broadcast anonymously ──
+    socket.on("send-message", ({ text }) => {
+        const roomCode = socketToRoom.get(socket.id);
+        if (!roomCode || !text) return;
+
+        const message = {
+            text: text.trim(),
+            timestamp: new Date().toISOString(),
+        };
+
+        console.log(`💬  Anonymous message in [${roomCode}]: ${message.text}`);
+
+        // Save to DB, then send to everyone in the room (including sender)
+        saveMessage(roomCode, message.text, message.timestamp)
+            .then(() => {
+                io.to(roomCode).emit("new-message", message);
+            })
+            .catch((err) => console.error("Error saving message:", err));
+    });
+
+    // ── Disconnect — clean up ──
+    socket.on("disconnect", () => {
+        const roomCode = socketToRoom.get(socket.id);
+
+        if (roomCode && rooms.has(roomCode)) {
+            const displayName = rooms.get(roomCode).get(socket.id);
+            rooms.get(roomCode).delete(socket.id);
+
+            // Remove empty rooms
+            if (rooms.get(roomCode).size === 0) {
+                rooms.delete(roomCode);
+                console.log(`🗑️   Room [${roomCode}] deleted (empty)`);
+            } else {
+                // Broadcast updated user list
+                io.to(roomCode).emit("room-users", getUserList(roomCode));
+            }
+
+            console.log(`👋  ${displayName || socket.id} left room [${roomCode}]`);
+        }
+
+        socketToRoom.delete(socket.id);
+        console.log(`❌  Disconnected: ${socket.id}`);
+    });
 });
 
 // ── Start ───────────────────────────────────────────────────
+initDb();
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`\n🚀  Anon Chat server running on http://0.0.0.0:${PORT}\n`);
+    console.log(`\n🚀  Anon Chat server running on http://0.0.0.0:${PORT}\n`);
 });
