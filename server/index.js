@@ -92,7 +92,7 @@ io.on("connection", (socket) => {
 
 // ── Catch-all route for React Navigation (Web) ────
 // If they go straight to `/` or navigate around, return `index.html`.
-app.get("*", (req, res) => {
+app.use((req, res) => {
     res.sendFile(path.join(clientDistPath, "index.html"));
 });
 
