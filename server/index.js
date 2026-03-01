@@ -2,7 +2,13 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
-const { initDb, saveMessage, getRoomHistory } = require("./database");
+const {
+    initDb,
+    saveMessage,
+    getRoomHistory,
+    addMember,
+    getRoomMembers,
+} = require("./database");
 
 const app = express();
 app.use(cors());
@@ -12,51 +18,40 @@ const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
-// ── In-memory data ──────────────────────────────────────────
-// rooms:        Map<roomCode, Map<socketId, displayName>>
-// socketToRoom: Map<socketId, roomCode>
-const rooms = new Map();
-const socketToRoom = new Map();
-
-// Helper: get the user list for a room
-function getUserList(roomCode) {
-    const members = rooms.get(roomCode);
-    if (!members) return [];
-    return Array.from(members.values());
-}
+// ── In-memory data (session tracking only) ──────────────────
+const socketToRoom = new Map(); // socketId → roomCode
 
 // ── Socket.io events ────────────────────────────────────────
 io.on("connection", (socket) => {
     console.log(`⚡  Connected: ${socket.id}`);
 
     // ── Join a room ──
-    socket.on("join-room", ({ displayName, roomCode }) => {
+    socket.on("join-room", async ({ displayName, roomCode }) => {
         if (!displayName || !roomCode) return;
 
-        // Create the room if it doesn't exist
-        if (!rooms.has(roomCode)) {
-            rooms.set(roomCode, new Map());
-        }
-
-        rooms.get(roomCode).set(socket.id, displayName);
         socketToRoom.set(socket.id, roomCode);
         socket.join(roomCode);
 
         console.log(`👤  ${displayName} joined room [${roomCode}]`);
 
-        // Broadcast updated user list to everyone in the room
-        io.to(roomCode).emit("room-users", getUserList(roomCode));
+        try {
+            // Persist member in DB
+            await addMember(roomCode, displayName);
 
-        // Send chat history to the joining user
-        getRoomHistory(roomCode)
-            .then((history) => {
-                socket.emit("chat-history", history);
-            })
-            .catch((err) => console.error("Error fetching history:", err));
+            // Send full (persistent) member list to everyone in the room
+            const members = await getRoomMembers(roomCode);
+            io.to(roomCode).emit("room-members", members);
+
+            // Send chat history to the joining user
+            const history = await getRoomHistory(roomCode);
+            socket.emit("chat-history", history);
+        } catch (err) {
+            console.error("Error during join:", err);
+        }
     });
 
     // ── Receive a message — strip identity, broadcast anonymously ──
-    socket.on("send-message", ({ text }) => {
+    socket.on("send-message", async ({ text }) => {
         const roomCode = socketToRoom.get(socket.id);
         if (!roomCode || !text) return;
 
@@ -67,36 +62,27 @@ io.on("connection", (socket) => {
 
         console.log(`💬  Anonymous message in [${roomCode}]: ${message.text}`);
 
-        // Save to DB, then send to everyone in the room (including sender)
-        saveMessage(roomCode, message.text, message.timestamp)
-            .then(() => {
-                io.to(roomCode).emit("new-message", message);
-            })
-            .catch((err) => console.error("Error saving message:", err));
+        try {
+            await saveMessage(roomCode, message.text, message.timestamp);
+            io.to(roomCode).emit("new-message", message);
+        } catch (err) {
+            console.error("Error saving message:", err);
+        }
     });
 
-    // ── Disconnect — clean up ──
+    // ── Typing indicator ──
+    socket.on("typing", () => {
+        const roomCode = socketToRoom.get(socket.id);
+        if (!roomCode) return;
+        // Broadcast to everyone EXCEPT the sender
+        socket.to(roomCode).emit("user-typing");
+    });
+
+    // ── Disconnect — clean up session ──
     socket.on("disconnect", () => {
         const roomCode = socketToRoom.get(socket.id);
-
-        if (roomCode && rooms.has(roomCode)) {
-            const displayName = rooms.get(roomCode).get(socket.id);
-            rooms.get(roomCode).delete(socket.id);
-
-            // Remove empty rooms
-            if (rooms.get(roomCode).size === 0) {
-                rooms.delete(roomCode);
-                console.log(`🗑️   Room [${roomCode}] deleted (empty)`);
-            } else {
-                // Broadcast updated user list
-                io.to(roomCode).emit("room-users", getUserList(roomCode));
-            }
-
-            console.log(`👋  ${displayName || socket.id} left room [${roomCode}]`);
-        }
-
         socketToRoom.delete(socket.id);
-        console.log(`❌  Disconnected: ${socket.id}`);
+        console.log(`❌  Disconnected: ${socket.id}${roomCode ? ` from [${roomCode}]` : ""}`);
     });
 });
 

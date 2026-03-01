@@ -10,21 +10,33 @@ import {
     Platform,
     Modal,
     Pressable,
+    AppState,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useIsFocused } from "@react-navigation/native";
 import { io } from "socket.io-client";
+import * as Notifications from "expo-notifications";
 import SOCKET_URL from "../config";
 
 export default function ChatRoomScreen({ route, navigation }) {
     const { displayName, roomCode } = route.params;
+    const isFocused = useIsFocused();
+    const isFocusedRef = useRef(isFocused);
 
     const socketRef = useRef(null);
     const flatListRef = useRef(null);
+    const typingTimeout = useRef(null);
 
     const [messages, setMessages] = useState([]);
-    const [users, setUsers] = useState([]);
+    const [members, setMembers] = useState([]);
     const [inputText, setInputText] = useState("");
     const [membersVisible, setMembersVisible] = useState(false);
+    const [isTyping, setIsTyping] = useState(false);
+
+    // Keep a ref in sync so the socket callback can read current focus state
+    useEffect(() => {
+        isFocusedRef.current = isFocused;
+    }, [isFocused]);
 
     // ── Connect on mount ──
     useEffect(() => {
@@ -38,8 +50,8 @@ export default function ChatRoomScreen({ route, navigation }) {
             socket.emit("join-room", { displayName, roomCode });
         });
 
-        socket.on("room-users", (userList) => {
-            setUsers(userList);
+        socket.on("room-members", (memberList) => {
+            setMembers(memberList);
         });
 
         socket.on("chat-history", (history) => {
@@ -48,6 +60,25 @@ export default function ChatRoomScreen({ route, navigation }) {
 
         socket.on("new-message", (msg) => {
             setMessages((prev) => [...prev, msg]);
+
+            // Show notification if screen is NOT focused or app is backgrounded
+            if (!isFocusedRef.current || AppState.currentState !== "active") {
+                Notifications.scheduleNotificationAsync({
+                    content: {
+                        title: `🔒 ${roomCode}`,
+                        body: msg.text,
+                        sound: true,
+                    },
+                    trigger: null, // fire immediately
+                });
+            }
+        });
+
+        // ── Typing indicator ──
+        socket.on("user-typing", () => {
+            setIsTyping(true);
+            clearTimeout(typingTimeout.current);
+            typingTimeout.current = setTimeout(() => setIsTyping(false), 2000);
         });
 
         socket.on("connect_error", (err) => {
@@ -56,8 +87,21 @@ export default function ChatRoomScreen({ route, navigation }) {
 
         return () => {
             socket.disconnect();
+            clearTimeout(typingTimeout.current);
         };
     }, [displayName, roomCode]);
+
+    // ── Emit typing event (debounced) ──
+    const typingDebounce = useRef(null);
+    const handleTextChange = (text) => {
+        setInputText(text);
+        if (socketRef.current && text.trim()) {
+            clearTimeout(typingDebounce.current);
+            typingDebounce.current = setTimeout(() => {
+                socketRef.current.emit("typing");
+            }, 300);
+        }
+    };
 
     // ── Send message ──
     const sendMessage = useCallback(() => {
@@ -98,7 +142,7 @@ export default function ChatRoomScreen({ route, navigation }) {
                     activeOpacity={0.7}
                 >
                     <View style={styles.membersBadge}>
-                        <Text style={styles.membersBadgeText}>👥 {users.length}</Text>
+                        <Text style={styles.membersBadgeText}>👥 {members.length}</Text>
                     </View>
                 </TouchableOpacity>
             </View>
@@ -115,10 +159,14 @@ export default function ChatRoomScreen({ route, navigation }) {
                     onPress={() => setMembersVisible(false)}
                 >
                     <View style={styles.modalCard}>
-                        <Text style={styles.modalTitle}>Members in Room</Text>
-                        {users.map((name, i) => (
+                        <Text style={styles.modalTitle}>Members</Text>
+                        {members.map((name, i) => (
                             <View key={i} style={styles.memberRow}>
-                                <Text style={styles.memberDot}>●</Text>
+                                <View style={styles.memberAvatar}>
+                                    <Text style={styles.memberAvatarText}>
+                                        {name.charAt(0).toUpperCase()}
+                                    </Text>
+                                </View>
                                 <Text style={styles.memberName}>{name}</Text>
                             </View>
                         ))}
@@ -152,6 +200,13 @@ export default function ChatRoomScreen({ route, navigation }) {
                 }
             />
 
+            {/* ── Typing indicator ── */}
+            {isTyping && (
+                <View style={styles.typingBar}>
+                    <Text style={styles.typingText}>someone is typing...</Text>
+                </View>
+            )}
+
             {/* ── Input bar ── */}
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -163,7 +218,7 @@ export default function ChatRoomScreen({ route, navigation }) {
                         placeholder="Type anonymously..."
                         placeholderTextColor="#555"
                         value={inputText}
-                        onChangeText={setInputText}
+                        onChangeText={handleTextChange}
                         multiline
                         maxLength={500}
                         onSubmitEditing={sendMessage}
@@ -258,10 +313,19 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingVertical: 8,
     },
-    memberDot: {
-        color: "#4ade80",
-        fontSize: 10,
-        marginRight: 10,
+    memberAvatar: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: "#2a2a44",
+        alignItems: "center",
+        justifyContent: "center",
+        marginRight: 12,
+    },
+    memberAvatarText: {
+        color: "#ffffff",
+        fontSize: 14,
+        fontWeight: "700",
     },
     memberName: {
         color: "#ccccee",
@@ -325,6 +389,17 @@ const styles = StyleSheet.create({
         fontSize: 14,
         textAlign: "center",
         lineHeight: 22,
+    },
+
+    // ── Typing indicator ──
+    typingBar: {
+        paddingHorizontal: 20,
+        paddingVertical: 6,
+    },
+    typingText: {
+        color: "#6c63ff",
+        fontSize: 13,
+        fontStyle: "italic",
     },
 
     // ── Input bar ──
