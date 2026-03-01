@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: anon-chat
+    env: node
+    plan: free
+    buildCommand: npm install && cd server && npm install && cd .. && npm run build:web
+    startCommand: cd server && node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production

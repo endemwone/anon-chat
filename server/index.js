@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
+const path = require("path");
 const {
     initDb,
     saveMessage,
@@ -13,19 +14,28 @@ const {
 const app = express();
 app.use(cors());
 
+// ── Render keep-alive trick (`/ping`) ─────────────
+// You can point uptimerobot.com to this endpoint
+app.get("/ping", (req, res) => {
+    res.status(200).send("pong");
+});
+
+// ── Serve compiled Expo Web app ───────────────────
+// We'll tell Render to build the frontend into `anon-chat/dist`
+const clientDistPath = path.join(__dirname, "../dist");
+app.use(express.static(clientDistPath));
+
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
 // ── In-memory data (session tracking only) ──────────────────
-const socketToRoom = new Map(); // socketId → roomCode
+const socketToRoom = new Map();
 
-// ── Socket.io events ────────────────────────────────────────
 io.on("connection", (socket) => {
     console.log(`⚡  Connected: ${socket.id}`);
 
-    // ── Join a room ──
     socket.on("join-room", async ({ displayName, roomCode }) => {
         if (!displayName || !roomCode) return;
 
@@ -35,14 +45,10 @@ io.on("connection", (socket) => {
         console.log(`👤  ${displayName} joined room [${roomCode}]`);
 
         try {
-            // Persist member in DB
             await addMember(roomCode, displayName);
-
-            // Send full (persistent) member list to everyone in the room
             const members = await getRoomMembers(roomCode);
             io.to(roomCode).emit("room-members", members);
 
-            // Send chat history to the joining user
             const history = await getRoomHistory(roomCode);
             socket.emit("chat-history", history);
         } catch (err) {
@@ -50,7 +56,6 @@ io.on("connection", (socket) => {
         }
     });
 
-    // ── Receive a message — strip identity, broadcast anonymously ──
     socket.on("send-message", async ({ text }) => {
         const roomCode = socketToRoom.get(socket.id);
         if (!roomCode || !text) return;
@@ -70,20 +75,25 @@ io.on("connection", (socket) => {
         }
     });
 
-    // ── Typing indicator ──
     socket.on("typing", () => {
         const roomCode = socketToRoom.get(socket.id);
         if (!roomCode) return;
-        // Broadcast to everyone EXCEPT the sender
         socket.to(roomCode).emit("user-typing");
     });
 
-    // ── Disconnect — clean up session ──
     socket.on("disconnect", () => {
         const roomCode = socketToRoom.get(socket.id);
         socketToRoom.delete(socket.id);
-        console.log(`❌  Disconnected: ${socket.id}${roomCode ? ` from [${roomCode}]` : ""}`);
+        console.log(
+            `❌  Disconnected: ${socket.id}${roomCode ? ` from [${roomCode}]` : ""}`
+        );
     });
+});
+
+// ── Catch-all route for React Navigation (Web) ────
+// If they go straight to `/` or navigate around, return `index.html`.
+app.get("*", (req, res) => {
+    res.sendFile(path.join(clientDistPath, "index.html"));
 });
 
 // ── Start ───────────────────────────────────────────────────
