@@ -28,4 +28,5 @@ server/node_modules/
 server/vapid.json
 server/vapid.txt
 server/vapid-keys.json
+server/stable-vapid.json
 server/chat.db
