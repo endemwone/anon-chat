@@ -23,6 +23,15 @@ function initDb() {
         UNIQUE(roomCode, displayName)
       )
     `);
+        db.run(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        roomCode TEXT NOT NULL,
+        socketId TEXT NOT NULL,
+        subscription TEXT NOT NULL,
+        UNIQUE(socketId)
+      )
+    `);
     });
     console.log("sqlite: Database initialized.");
 }
@@ -83,10 +92,62 @@ function getRoomMembers(roomCode) {
     });
 }
 
+// ── Push Subscriptions ──
+
+function saveSubscription(roomCode, socketId, subscription) {
+    return new Promise((resolve, reject) => {
+        // Upsert: if socketId already exists, update it
+        db.run(
+            `INSERT INTO push_subscriptions (roomCode, socketId, subscription)
+       VALUES (?, ?, ?)
+       ON CONFLICT(socketId) DO UPDATE SET roomCode = excluded.roomCode, subscription = excluded.subscription`,
+            [roomCode, socketId, JSON.stringify(subscription)],
+            function (err) {
+                if (err) return reject(err);
+                resolve(this.lastID);
+            }
+        );
+    });
+}
+
+function getSubscriptionsForRoom(roomCode) {
+    return new Promise((resolve, reject) => {
+        db.all(
+            "SELECT socketId, subscription FROM push_subscriptions WHERE roomCode = ?",
+            [roomCode],
+            (err, rows) => {
+                if (err) return reject(err);
+                resolve(
+                    rows.map((r) => ({
+                        socketId: r.socketId,
+                        subscription: JSON.parse(r.subscription),
+                    }))
+                );
+            }
+        );
+    });
+}
+
+function removeSubscription(socketId) {
+    return new Promise((resolve, reject) => {
+        db.run(
+            "DELETE FROM push_subscriptions WHERE socketId = ?",
+            [socketId],
+            function (err) {
+                if (err) return reject(err);
+                resolve(this.changes);
+            }
+        );
+    });
+}
+
 module.exports = {
     initDb,
     saveMessage,
     getRoomHistory,
     addMember,
     getRoomMembers,
+    saveSubscription,
+    getSubscriptionsForRoom,
+    removeSubscription,
 };

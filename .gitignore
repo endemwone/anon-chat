@@ -25,3 +25,7 @@ Thumbs.db
 
 # Server
 server/node_modules/
+server/vapid.json
+server/vapid.txt
+server/vapid-keys.json
+server/chat.db

@@ -48,6 +48,11 @@ export default function ChatRoomScreen({ route, navigation }) {
 
         socket.on("connect", () => {
             socket.emit("join-room", { displayName, roomCode });
+
+            // Register Web Push on web platform
+            if (Platform.OS === "web" && "serviceWorker" in navigator) {
+                registerWebPush(socket);
+            }
         });
 
         socket.on("room-members", (memberList) => {
@@ -61,17 +66,21 @@ export default function ChatRoomScreen({ route, navigation }) {
         socket.on("new-message", (msg) => {
             setMessages((prev) => [...prev, msg]);
 
-            // Show notification if screen is NOT focused or app is backgrounded
-            if (!isFocusedRef.current || AppState.currentState !== "active") {
+            // On native (non-web), use expo-notifications for local alerts
+            if (
+                Platform.OS !== "web" &&
+                (!isFocusedRef.current || AppState.currentState !== "active")
+            ) {
                 Notifications.scheduleNotificationAsync({
                     content: {
                         title: `🔒 ${roomCode}`,
                         body: msg.text,
                         sound: true,
                     },
-                    trigger: null, // fire immediately
+                    trigger: null,
                 });
             }
+            // On web, the server sends Web Push via the service worker
         });
 
         // ── Typing indicator ──
@@ -90,6 +99,41 @@ export default function ChatRoomScreen({ route, navigation }) {
             clearTimeout(typingTimeout.current);
         };
     }, [displayName, roomCode]);
+
+    // ── Web Push Registration (web only) ──
+    const registerWebPush = async (socket) => {
+        try {
+            const registration = await navigator.serviceWorker.register(
+                "/service-worker.js"
+            );
+            console.log("Service Worker registered.");
+
+            // Fetch the VAPID public key from the server
+            const res = await fetch(`${SOCKET_URL}/vapid-public-key`);
+            const { publicKey } = await res.json();
+
+            // Convert the VAPID public key to a Uint8Array
+            const urlBase64ToUint8Array = (base64String) => {
+                const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+                const base64 = (base64String + padding)
+                    .replace(/-/g, "+")
+                    .replace(/_/g, "/");
+                const rawData = window.atob(base64);
+                return new Uint8Array([...rawData].map((c) => c.charCodeAt(0)));
+            };
+
+            const subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(publicKey),
+            });
+
+            // Send the push subscription to the server
+            socket.emit("register-push", subscription.toJSON());
+            console.log("Web Push subscription registered.");
+        } catch (err) {
+            console.warn("Web Push registration failed:", err);
+        }
+    };
 
     // ── Emit typing event (debounced) ──
     const typingDebounce = useRef(null);
