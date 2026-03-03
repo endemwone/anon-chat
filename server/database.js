@@ -28,9 +28,10 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS push_subscriptions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       roomCode TEXT NOT NULL,
+      endpoint TEXT NOT NULL,
       socketId TEXT NOT NULL,
       subscription TEXT NOT NULL,
-      UNIQUE(socketId)
+      UNIQUE(endpoint)
     )
   `);
     console.log("turso: Database initialized.");
@@ -75,11 +76,12 @@ async function getRoomMembers(roomCode) {
 // ── Push Subscriptions ──
 
 async function saveSubscription(roomCode, socketId, subscription) {
+    const endpoint = subscription.endpoint || '';
     const result = await db.execute({
-        sql: `INSERT INTO push_subscriptions (roomCode, socketId, subscription)
-          VALUES (?, ?, ?)
-          ON CONFLICT(socketId) DO UPDATE SET roomCode = excluded.roomCode, subscription = excluded.subscription`,
-        args: [roomCode, socketId, JSON.stringify(subscription)],
+        sql: `INSERT INTO push_subscriptions (roomCode, endpoint, socketId, subscription)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(endpoint) DO UPDATE SET roomCode = excluded.roomCode, socketId = excluded.socketId, subscription = excluded.subscription`,
+        args: [roomCode, endpoint, socketId, JSON.stringify(subscription)],
     });
     return result.lastInsertRowid;
 }
