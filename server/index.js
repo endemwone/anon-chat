@@ -104,19 +104,21 @@ io.on("connection", (socket) => {
         }
     });
 
-    socket.on("send-message", async ({ text }) => {
+    socket.on("send-message", async ({ text, replyTo }) => {
         const roomCode = socketToRoom.get(socket.id);
         if (!roomCode || !text) return;
 
         const message = {
             text: text.trim(),
             timestamp: new Date().toISOString(),
+            replyTo: replyTo || null,
         };
 
         console.log(`💬  Anonymous message in [${roomCode}]: ${message.text}`);
 
         try {
-            await saveMessage(roomCode, message.text, message.timestamp);
+            const msgId = await saveMessage(roomCode, message.text, message.timestamp, message.replyTo);
+            message.id = Number(msgId);
             io.to(roomCode).emit("new-message", message);
 
             // Send Web Push to all subscribers in the room except the sender
@@ -147,6 +149,19 @@ io.on("connection", (socket) => {
         const roomCode = socketToRoom.get(socket.id);
         if (!roomCode) return;
         socket.to(roomCode).emit("user-typing");
+    });
+
+    // ── Load older messages (pagination) ──
+    socket.on("load-more-messages", async ({ beforeId }) => {
+        const roomCode = socketToRoom.get(socket.id);
+        if (!roomCode || !beforeId) return;
+
+        try {
+            const older = await getRoomHistory(roomCode, 25, beforeId);
+            socket.emit("older-messages", older);
+        } catch (err) {
+            console.error("Error loading older messages:", err);
+        }
     });
 
     // ── Polls ──

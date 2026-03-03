@@ -53,25 +53,41 @@ async function initDb() {
       FOREIGN KEY (pollId) REFERENCES polls(id)
     )
   `);
+    // Migration: add replyTo column if it doesn't exist
+    try {
+        await db.execute(`ALTER TABLE messages ADD COLUMN replyTo TEXT`);
+    } catch (e) {
+        // Column already exists, ignore
+    }
     console.log("turso: Database initialized.");
 }
 
 // ── Messages ──
 
-async function saveMessage(roomCode, text, timestamp) {
+async function saveMessage(roomCode, text, timestamp, replyTo = null) {
     const result = await db.execute({
-        sql: "INSERT INTO messages (roomCode, text, timestamp) VALUES (?, ?, ?)",
-        args: [roomCode, text, timestamp],
+        sql: "INSERT INTO messages (roomCode, text, timestamp, replyTo) VALUES (?, ?, ?, ?)",
+        args: [roomCode, text, timestamp, replyTo ? JSON.stringify(replyTo) : null],
     });
     return result.lastInsertRowid;
 }
 
-async function getRoomHistory(roomCode) {
-    const result = await db.execute({
-        sql: "SELECT text, timestamp FROM messages WHERE roomCode = ? ORDER BY id DESC LIMIT 50",
-        args: [roomCode],
-    });
-    return result.rows.reverse();
+async function getRoomHistory(roomCode, limit = 50, beforeId = null) {
+    let sql, args;
+    if (beforeId) {
+        sql = "SELECT id, text, timestamp, replyTo FROM messages WHERE roomCode = ? AND id < ? ORDER BY id DESC LIMIT ?";
+        args = [roomCode, beforeId, limit];
+    } else {
+        sql = "SELECT id, text, timestamp, replyTo FROM messages WHERE roomCode = ? ORDER BY id DESC LIMIT ?";
+        args = [roomCode, limit];
+    }
+    const result = await db.execute({ sql, args });
+    return result.rows.reverse().map((r) => ({
+        id: Number(r.id),
+        text: r.text,
+        timestamp: r.timestamp,
+        replyTo: r.replyTo ? JSON.parse(r.replyTo) : null,
+    }));
 }
 
 // ── Room Members ──
