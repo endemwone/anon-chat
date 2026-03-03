@@ -1,144 +1,106 @@
-const sqlite3 = require("sqlite3").verbose();
-const path = require("path");
+const { createClient } = require("@libsql/client");
 
-const dbPath = path.join(__dirname, "chat.db");
-const db = new sqlite3.Database(dbPath);
+// ── Turso Cloud SQLite ──────────────────────────────
+const db = createClient({
+    url: process.env.TURSO_DATABASE_URL,
+    authToken: process.env.TURSO_AUTH_TOKEN,
+});
 
-function initDb() {
-    db.serialize(() => {
-        db.run(`
-      CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        roomCode TEXT NOT NULL,
-        text TEXT NOT NULL,
-        timestamp TEXT NOT NULL
-      )
-    `);
-        db.run(`
-      CREATE TABLE IF NOT EXISTS room_members (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        roomCode TEXT NOT NULL,
-        displayName TEXT NOT NULL,
-        joinedAt TEXT NOT NULL,
-        UNIQUE(roomCode, displayName)
-      )
-    `);
-        db.run(`
-      CREATE TABLE IF NOT EXISTS push_subscriptions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        roomCode TEXT NOT NULL,
-        socketId TEXT NOT NULL,
-        subscription TEXT NOT NULL,
-        UNIQUE(socketId)
-      )
-    `);
-    });
-    console.log("sqlite: Database initialized.");
+async function initDb() {
+    await db.execute(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      roomCode TEXT NOT NULL,
+      text TEXT NOT NULL,
+      timestamp TEXT NOT NULL
+    )
+  `);
+    await db.execute(`
+    CREATE TABLE IF NOT EXISTS room_members (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      roomCode TEXT NOT NULL,
+      displayName TEXT NOT NULL,
+      joinedAt TEXT NOT NULL,
+      UNIQUE(roomCode, displayName)
+    )
+  `);
+    await db.execute(`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      roomCode TEXT NOT NULL,
+      socketId TEXT NOT NULL,
+      subscription TEXT NOT NULL,
+      UNIQUE(socketId)
+    )
+  `);
+    console.log("turso: Database initialized.");
 }
 
 // ── Messages ──
 
-function saveMessage(roomCode, text, timestamp) {
-    return new Promise((resolve, reject) => {
-        db.run(
-            "INSERT INTO messages (roomCode, text, timestamp) VALUES (?, ?, ?)",
-            [roomCode, text, timestamp],
-            function (err) {
-                if (err) return reject(err);
-                resolve(this.lastID);
-            }
-        );
+async function saveMessage(roomCode, text, timestamp) {
+    const result = await db.execute({
+        sql: "INSERT INTO messages (roomCode, text, timestamp) VALUES (?, ?, ?)",
+        args: [roomCode, text, timestamp],
     });
+    return result.lastInsertRowid;
 }
 
-function getRoomHistory(roomCode) {
-    return new Promise((resolve, reject) => {
-        db.all(
-            "SELECT text, timestamp FROM messages WHERE roomCode = ? ORDER BY id DESC LIMIT 50",
-            [roomCode],
-            (err, rows) => {
-                if (err) return reject(err);
-                resolve(rows.reverse());
-            }
-        );
+async function getRoomHistory(roomCode) {
+    const result = await db.execute({
+        sql: "SELECT text, timestamp FROM messages WHERE roomCode = ? ORDER BY id DESC LIMIT 50",
+        args: [roomCode],
     });
+    return result.rows.reverse();
 }
 
 // ── Room Members ──
 
-function addMember(roomCode, displayName) {
-    return new Promise((resolve, reject) => {
-        db.run(
-            "INSERT OR IGNORE INTO room_members (roomCode, displayName, joinedAt) VALUES (?, ?, ?)",
-            [roomCode, displayName, new Date().toISOString()],
-            function (err) {
-                if (err) return reject(err);
-                resolve(this.lastID);
-            }
-        );
+async function addMember(roomCode, displayName) {
+    const result = await db.execute({
+        sql: "INSERT OR IGNORE INTO room_members (roomCode, displayName, joinedAt) VALUES (?, ?, ?)",
+        args: [roomCode, displayName, new Date().toISOString()],
     });
+    return result.lastInsertRowid;
 }
 
-function getRoomMembers(roomCode) {
-    return new Promise((resolve, reject) => {
-        db.all(
-            "SELECT displayName, joinedAt FROM room_members WHERE roomCode = ? ORDER BY joinedAt ASC",
-            [roomCode],
-            (err, rows) => {
-                if (err) return reject(err);
-                resolve(rows.map((r) => r.displayName));
-            }
-        );
+async function getRoomMembers(roomCode) {
+    const result = await db.execute({
+        sql: "SELECT displayName FROM room_members WHERE roomCode = ? ORDER BY joinedAt ASC",
+        args: [roomCode],
     });
+    return result.rows.map((r) => r.displayName);
 }
 
 // ── Push Subscriptions ──
 
-function saveSubscription(roomCode, socketId, subscription) {
-    return new Promise((resolve, reject) => {
-        // Upsert: if socketId already exists, update it
-        db.run(
-            `INSERT INTO push_subscriptions (roomCode, socketId, subscription)
-       VALUES (?, ?, ?)
-       ON CONFLICT(socketId) DO UPDATE SET roomCode = excluded.roomCode, subscription = excluded.subscription`,
-            [roomCode, socketId, JSON.stringify(subscription)],
-            function (err) {
-                if (err) return reject(err);
-                resolve(this.lastID);
-            }
-        );
+async function saveSubscription(roomCode, socketId, subscription) {
+    const result = await db.execute({
+        sql: `INSERT INTO push_subscriptions (roomCode, socketId, subscription)
+          VALUES (?, ?, ?)
+          ON CONFLICT(socketId) DO UPDATE SET roomCode = excluded.roomCode, subscription = excluded.subscription`,
+        args: [roomCode, socketId, JSON.stringify(subscription)],
     });
+    return result.lastInsertRowid;
 }
 
-function getSubscriptionsForRoom(roomCode) {
-    return new Promise((resolve, reject) => {
-        db.all(
-            "SELECT socketId, subscription FROM push_subscriptions WHERE roomCode = ?",
-            [roomCode],
-            (err, rows) => {
-                if (err) return reject(err);
-                resolve(
-                    rows.map((r) => ({
-                        socketId: r.socketId,
-                        subscription: JSON.parse(r.subscription),
-                    }))
-                );
-            }
-        );
+async function getSubscriptionsForRoom(roomCode) {
+    const result = await db.execute({
+        sql: "SELECT socketId, subscription FROM push_subscriptions WHERE roomCode = ?",
+        args: [roomCode],
     });
+    return result.rows.map((r) => ({
+        socketId: r.socketId,
+        subscription: JSON.parse(r.subscription),
+    }));
 }
 
-function removeSubscription(socketId) {
-    return new Promise((resolve, reject) => {
-        db.run(
-            "DELETE FROM push_subscriptions WHERE socketId = ?",
-            [socketId],
-            function (err) {
-                if (err) return reject(err);
-                resolve(this.changes);
-            }
-        );
+async function removeSubscription(socketId) {
+    const result = await db.execute({
+        sql: "DELETE FROM push_subscriptions WHERE socketId = ?",
+        args: [socketId],
     });
+    return result.rowsAffected;
 }
 
 module.exports = {

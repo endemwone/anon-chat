@@ -161,9 +161,11 @@ app.use((req, res) => {
 });
 
 // ── Start ───────────────────────────────────────────
-initDb();
-
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, "0.0.0.0", () => {
-    console.log(`\n🚀  Anon Chat server running on http://0.0.0.0:${PORT}\n`);
-});
+
+(async () => {
+    await initDb();
+    server.listen(PORT, "0.0.0.0", () => {
+        console.log(`\n🚀  Anon Chat server running on http://0.0.0.0:${PORT}\n`);
+    });
+})();

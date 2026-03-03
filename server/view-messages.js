@@ -1,19 +1,22 @@
-const sqlite3 = require("sqlite3").verbose();
-const path = require("path");
+require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
+const { createClient } = require("@libsql/client");
 
-const dbPath = path.join(__dirname, "chat.db");
-const db = new sqlite3.Database(dbPath);
+const db = createClient({
+    url: process.env.TURSO_DATABASE_URL,
+    authToken: process.env.TURSO_AUTH_TOKEN,
+});
 
-console.log("--- LATEST 20 MESSAGES ---");
-db.all("SELECT * FROM messages ORDER BY id DESC LIMIT 20", (err, rows) => {
-    if (err) {
-        console.error("Error reading database:", err);
-    } else {
-        if (rows.length === 0) {
+(async () => {
+    console.log("--- LATEST 20 MESSAGES ---");
+    try {
+        const result = await db.execute(
+            "SELECT * FROM messages ORDER BY id DESC LIMIT 20"
+        );
+        if (result.rows.length === 0) {
             console.log("No messages found yet.");
         } else {
             console.table(
-                rows.map((row) => ({
+                result.rows.map((row) => ({
                     ID: row.id,
                     Room: row.roomCode,
                     Text: row.text,
@@ -21,6 +24,7 @@ db.all("SELECT * FROM messages ORDER BY id DESC LIMIT 20", (err, rows) => {
                 }))
             );
         }
+    } catch (err) {
+        console.error("Error reading database:", err);
     }
-    db.close();
-});
+})();
