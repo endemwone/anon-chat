@@ -27,8 +27,6 @@ export default function ChatRoomScreen({ route, navigation }) {
     const socketRef = useRef(null);
     const flatListRef = useRef(null);
     const typingTimeout = useRef(null);
-    const isNearBottom = useRef(true);
-    const isInitialLoad = useRef(true);
 
     const [messages, setMessages] = useState([]);
     const [members, setMembers] = useState([]);
@@ -69,7 +67,6 @@ export default function ChatRoomScreen({ route, navigation }) {
         socket.on("room-members", (memberList) => setMembers(memberList));
 
         socket.on("chat-history", (history) => {
-            isInitialLoad.current = true;
             setMessages(history);
             if (history.length < 50) setHasMoreMessages(false);
         });
@@ -178,7 +175,7 @@ export default function ChatRoomScreen({ route, navigation }) {
 
     // ── Poll helpers ──
     const addPollOption = () => {
-        if (pollOptions.length < 4) setPollOptions([...pollOptions, ""]);
+        if (pollOptions.length < 10) setPollOptions([...pollOptions, ""]);
     };
     const removePollOption = (i) => {
         if (pollOptions.length > 2) setPollOptions(pollOptions.filter((_, idx) => idx !== i));
@@ -315,7 +312,7 @@ export default function ChatRoomScreen({ route, navigation }) {
                                 )}
                             </View>
                         ))}
-                        {pollOptions.length < 4 && (
+                        {pollOptions.length < 10 && (
                             <TouchableOpacity style={styles.pollAddOptionBtn} onPress={addPollOption}>
                                 <Text style={styles.pollAddOptionText}>+ Add Option</Text>
                             </TouchableOpacity>
@@ -338,17 +335,10 @@ export default function ChatRoomScreen({ route, navigation }) {
                 keyExtractor={(item, i) => `${item.type}-${item.id || i}`}
                 renderItem={renderFeedItem}
                 contentContainerStyle={styles.messagesList}
-                onContentSizeChange={() => {
-                    if (isInitialLoad.current || isNearBottom.current) {
-                        flatListRef.current?.scrollToEnd({ animated: !isInitialLoad.current });
-                        isInitialLoad.current = false;
-                    }
-                }}
-                onScroll={(e) => {
-                    const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
-                    const distFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
-                    isNearBottom.current = distFromBottom < 100;
-                }}
+                onContentSizeChange={() =>
+                    flatListRef.current?.scrollToEnd({ animated: true })
+                }
+
                 scrollEventThrottle={100}
                 onStartReached={loadOlderMessages}
                 onStartReachedThreshold={0.1}
