@@ -23,7 +23,12 @@
       }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "meta": {
+        "viewport": "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+      },
+      "backgroundColor": "#0f0f1a",
+      "themeColor": "#0f0f1a"
     }
   }
 }

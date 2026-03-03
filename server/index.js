@@ -3,7 +3,6 @@ const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 const path = require("path");
-const fs = require("fs");
 const webpush = require("web-push");
 const {
     initDb,
@@ -16,18 +15,16 @@ const {
     removeSubscription,
 } = require("./database");
 
-// ── VAPID Key Management ────────────────────────────
-// Auto-generate keys on first run, then reuse from vapid.json
-const vapidPath = path.join(__dirname, "vapid.json");
-let vapidKeys;
+// ── VAPID keys from environment variables ───────────
+// These must be set in Render's env var dashboard so they persist across deploys.
+const vapidKeys = {
+    publicKey: process.env.VAPID_PUBLIC_KEY,
+    privateKey: process.env.VAPID_PRIVATE_KEY,
+};
 
-if (fs.existsSync(vapidPath)) {
-    vapidKeys = JSON.parse(fs.readFileSync(vapidPath, "utf-8"));
-    console.log("vapid: Loaded existing keys.");
-} else {
-    vapidKeys = webpush.generateVAPIDKeys();
-    fs.writeFileSync(vapidPath, JSON.stringify(vapidKeys, null, 2));
-    console.log("vapid: Generated and saved new keys.");
+if (!vapidKeys.publicKey || !vapidKeys.privateKey) {
+    console.error("⚠️  VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY env vars are required for Web Push!");
+    console.error("   Generate with: npx web-push generate-vapid-keys");
 }
 
 webpush.setVapidDetails(
