@@ -34,6 +34,25 @@ async function initDb() {
       UNIQUE(endpoint)
     )
   `);
+    await db.execute(`
+    CREATE TABLE IF NOT EXISTS polls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      roomCode TEXT NOT NULL,
+      question TEXT NOT NULL,
+      options TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    )
+  `);
+    await db.execute(`
+    CREATE TABLE IF NOT EXISTS poll_votes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pollId INTEGER NOT NULL,
+      optionIndex INTEGER NOT NULL,
+      voterKey TEXT NOT NULL,
+      UNIQUE(pollId, voterKey),
+      FOREIGN KEY (pollId) REFERENCES polls(id)
+    )
+  `);
     console.log("turso: Database initialized.");
 }
 
@@ -105,6 +124,75 @@ async function removeSubscription(socketId) {
     return result.rowsAffected;
 }
 
+// ── Polls ──
+
+async function createPoll(roomCode, question, options, createdAt) {
+    const result = await db.execute({
+        sql: "INSERT INTO polls (roomCode, question, options, createdAt) VALUES (?, ?, ?, ?)",
+        args: [roomCode, question, JSON.stringify(options), createdAt],
+    });
+    return Number(result.lastInsertRowid);
+}
+
+async function votePoll(pollId, optionIndex, voterKey) {
+    await db.execute({
+        sql: `INSERT INTO poll_votes (pollId, optionIndex, voterKey)
+          VALUES (?, ?, ?)
+          ON CONFLICT(pollId, voterKey) DO UPDATE SET optionIndex = excluded.optionIndex`,
+        args: [pollId, optionIndex, voterKey],
+    });
+}
+
+async function getPollResults(pollId) {
+    const pollResult = await db.execute({
+        sql: "SELECT id, question, options, createdAt FROM polls WHERE id = ?",
+        args: [pollId],
+    });
+    if (pollResult.rows.length === 0) return null;
+    const poll = pollResult.rows[0];
+
+    const votesResult = await db.execute({
+        sql: "SELECT optionIndex, COUNT(*) as count FROM poll_votes WHERE pollId = ? GROUP BY optionIndex",
+        args: [pollId],
+    });
+
+    const options = JSON.parse(poll.options);
+    const votes = new Array(options.length).fill(0);
+    for (const row of votesResult.rows) {
+        votes[Number(row.optionIndex)] = Number(row.count);
+    }
+
+    return {
+        id: Number(poll.id),
+        question: poll.question,
+        options,
+        votes,
+        totalVotes: votes.reduce((a, b) => a + b, 0),
+        createdAt: poll.createdAt,
+    };
+}
+
+async function getRoomPolls(roomCode) {
+    const result = await db.execute({
+        sql: "SELECT id FROM polls WHERE roomCode = ? ORDER BY id ASC",
+        args: [roomCode],
+    });
+    const polls = [];
+    for (const row of result.rows) {
+        const poll = await getPollResults(Number(row.id));
+        if (poll) polls.push(poll);
+    }
+    return polls;
+}
+
+async function getVoterChoice(pollId, voterKey) {
+    const result = await db.execute({
+        sql: "SELECT optionIndex FROM poll_votes WHERE pollId = ? AND voterKey = ?",
+        args: [pollId, voterKey],
+    });
+    return result.rows.length > 0 ? Number(result.rows[0].optionIndex) : null;
+}
+
 module.exports = {
     initDb,
     saveMessage,
@@ -114,4 +202,9 @@ module.exports = {
     saveSubscription,
     getSubscriptionsForRoom,
     removeSubscription,
+    createPoll,
+    votePoll,
+    getPollResults,
+    getRoomPolls,
+    getVoterChoice,
 };

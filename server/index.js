@@ -13,6 +13,11 @@ const {
     saveSubscription,
     getSubscriptionsForRoom,
     removeSubscription,
+    createPoll,
+    votePoll,
+    getPollResults,
+    getRoomPolls,
+    getVoterChoice,
 } = require("./database");
 
 // ── VAPID keys from environment variables ───────────
@@ -78,6 +83,9 @@ io.on("connection", (socket) => {
 
             const history = await getRoomHistory(roomCode);
             socket.emit("chat-history", history);
+
+            const polls = await getRoomPolls(roomCode);
+            socket.emit("poll-history", polls);
         } catch (err) {
             console.error("Error during join:", err);
         }
@@ -139,6 +147,36 @@ io.on("connection", (socket) => {
         const roomCode = socketToRoom.get(socket.id);
         if (!roomCode) return;
         socket.to(roomCode).emit("user-typing");
+    });
+
+    // ── Polls ──
+    socket.on("create-poll", async ({ question, options }) => {
+        const roomCode = socketToRoom.get(socket.id);
+        if (!roomCode || !question || !options || options.length < 2) return;
+
+        try {
+            const createdAt = new Date().toISOString();
+            const pollId = await createPoll(roomCode, question.trim(), options.map(o => o.trim()), createdAt);
+            const poll = await getPollResults(pollId);
+            io.to(roomCode).emit("new-poll", poll);
+            console.log(`📊  Poll created in [${roomCode}]: ${question}`);
+        } catch (err) {
+            console.error("Error creating poll:", err);
+        }
+    });
+
+    socket.on("vote-poll", async ({ pollId, optionIndex }) => {
+        const roomCode = socketToRoom.get(socket.id);
+        if (!roomCode || pollId == null || optionIndex == null) return;
+
+        try {
+            // Use socket.id as voter key for anonymity
+            await votePoll(pollId, optionIndex, socket.id);
+            const poll = await getPollResults(pollId);
+            io.to(roomCode).emit("poll-update", poll);
+        } catch (err) {
+            console.error("Error voting on poll:", err);
+        }
     });
 
     socket.on("disconnect", async () => {

@@ -31,9 +31,15 @@ export default function ChatRoomScreen({ route, navigation }) {
 
     const [messages, setMessages] = useState([]);
     const [members, setMembers] = useState([]);
+    const [polls, setPolls] = useState([]);
     const [inputText, setInputText] = useState("");
     const [membersVisible, setMembersVisible] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
+
+    // Poll creation state
+    const [pollModalVisible, setPollModalVisible] = useState(false);
+    const [pollQuestion, setPollQuestion] = useState("");
+    const [pollOptions, setPollOptions] = useState(["", ""]);
 
     // Keep a ref in sync so the socket callback can read current focus state
     useEffect(() => {
@@ -84,6 +90,21 @@ export default function ChatRoomScreen({ route, navigation }) {
                 });
             }
             // On web, the server sends Web Push via the service worker
+        });
+
+        // ── Polls ──
+        socket.on("poll-history", (pollList) => {
+            setPolls(pollList);
+        });
+
+        socket.on("new-poll", (poll) => {
+            setPolls((prev) => [...prev, poll]);
+        });
+
+        socket.on("poll-update", (updatedPoll) => {
+            setPolls((prev) =>
+                prev.map((p) => (p.id === updatedPoll.id ? updatedPoll : p))
+            );
         });
 
         // ── Typing indicator ──
@@ -158,19 +179,100 @@ export default function ChatRoomScreen({ route, navigation }) {
         setInputText("");
     }, [inputText]);
 
+    // ── Poll creation ──
+    const addPollOption = () => {
+        if (pollOptions.length < 4) {
+            setPollOptions([...pollOptions, ""]);
+        }
+    };
+
+    const removePollOption = (index) => {
+        if (pollOptions.length > 2) {
+            setPollOptions(pollOptions.filter((_, i) => i !== index));
+        }
+    };
+
+    const submitPoll = () => {
+        const q = pollQuestion.trim();
+        const opts = pollOptions.map((o) => o.trim()).filter(Boolean);
+        if (!q || opts.length < 2 || !socketRef.current) return;
+
+        socketRef.current.emit("create-poll", { question: q, options: opts });
+        setPollQuestion("");
+        setPollOptions(["", ""]);
+        setPollModalVisible(false);
+    };
+
+    const voteOnPoll = (pollId, optionIndex) => {
+        if (!socketRef.current) return;
+        socketRef.current.emit("vote-poll", { pollId, optionIndex });
+    };
+
+    // ── Build combined feed (messages + polls sorted by time) ──
+    const buildFeed = () => {
+        const feed = [];
+        messages.forEach((m) => feed.push({ type: "message", ...m }));
+        polls.forEach((p) => feed.push({ type: "poll", ...p, timestamp: p.createdAt }));
+        feed.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        return feed;
+    };
+
     // ── Format timestamp ──
     const formatTime = (iso) => {
         const d = new Date(iso);
         return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     };
 
-    // ── Render a single message bubble ──
-    const renderMessage = ({ item }) => (
-        <View style={styles.messageBubble}>
-            <Text style={styles.messageText}>{item.text}</Text>
-            <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
-        </View>
-    );
+    // ── Render a poll card ──
+    const renderPollCard = (item) => {
+        const maxVotes = Math.max(...item.votes, 1);
+        return (
+            <View style={styles.pollCard}>
+                <Text style={styles.pollLabel}>📊 POLL</Text>
+                <Text style={styles.pollQuestion}>{item.question}</Text>
+                {item.options.map((opt, i) => {
+                    const pct = item.totalVotes > 0 ? Math.round((item.votes[i] / item.totalVotes) * 100) : 0;
+                    return (
+                        <TouchableOpacity
+                            key={i}
+                            style={styles.pollOptionBtn}
+                            onPress={() => voteOnPoll(item.id, i)}
+                            activeOpacity={0.7}
+                        >
+                            <View
+                                style={[
+                                    styles.pollOptionFill,
+                                    { width: `${pct}%` },
+                                ]}
+                            />
+                            <Text style={styles.pollOptionText}>
+                                {opt}
+                            </Text>
+                            <Text style={styles.pollOptionVotes}>
+                                {item.votes[i]} ({pct}%)
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
+                <Text style={styles.pollMeta}>
+                    {item.totalVotes} vote{item.totalVotes !== 1 ? "s" : ""} · {formatTime(item.createdAt)}
+                </Text>
+            </View>
+        );
+    };
+
+    // ── Render a feed item ──
+    const renderFeedItem = ({ item }) => {
+        if (item.type === "poll") return renderPollCard(item);
+        return (
+            <View style={styles.messageBubble}>
+                <Text style={styles.messageText}>{item.text}</Text>
+                <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
+            </View>
+        );
+    };
+
+    const feedData = buildFeed();
 
     return (
         <SafeAreaView style={styles.safe}>
@@ -227,12 +329,84 @@ export default function ChatRoomScreen({ route, navigation }) {
                 </Pressable>
             </Modal>
 
-            {/* ── Messages ── */}
+            {/* ── Poll Creation Modal ── */}
+            <Modal
+                visible={pollModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setPollModalVisible(false)}
+            >
+                <Pressable
+                    style={styles.modalOverlay}
+                    onPress={() => setPollModalVisible(false)}
+                >
+                    <Pressable style={styles.pollModalCard} onPress={() => { }}>
+                        <Text style={styles.modalTitle}>📊 Create Poll</Text>
+                        <TextInput
+                            style={styles.pollInput}
+                            placeholder="Ask a question..."
+                            placeholderTextColor="#555"
+                            value={pollQuestion}
+                            onChangeText={setPollQuestion}
+                            maxLength={200}
+                        />
+                        {pollOptions.map((opt, i) => (
+                            <View key={i} style={styles.pollOptionRow}>
+                                <TextInput
+                                    style={[styles.pollInput, { flex: 1 }]}
+                                    placeholder={`Option ${i + 1}`}
+                                    placeholderTextColor="#555"
+                                    value={opt}
+                                    onChangeText={(text) => {
+                                        const copy = [...pollOptions];
+                                        copy[i] = text;
+                                        setPollOptions(copy);
+                                    }}
+                                    maxLength={100}
+                                />
+                                {pollOptions.length > 2 && (
+                                    <TouchableOpacity
+                                        onPress={() => removePollOption(i)}
+                                        style={styles.pollRemoveBtn}
+                                    >
+                                        <Text style={styles.pollRemoveText}>✕</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        ))}
+                        {pollOptions.length < 4 && (
+                            <TouchableOpacity
+                                style={styles.pollAddOptionBtn}
+                                onPress={addPollOption}
+                            >
+                                <Text style={styles.pollAddOptionText}>+ Add Option</Text>
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                            style={[
+                                styles.modalClose,
+                                (!pollQuestion.trim() ||
+                                    pollOptions.filter((o) => o.trim()).length < 2) &&
+                                styles.sendButtonDisabled,
+                            ]}
+                            onPress={submitPoll}
+                            disabled={
+                                !pollQuestion.trim() ||
+                                pollOptions.filter((o) => o.trim()).length < 2
+                            }
+                        >
+                            <Text style={styles.modalCloseText}>Create Poll</Text>
+                        </TouchableOpacity>
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
+            {/* ── Messages + Polls Feed ── */}
             <FlatList
                 ref={flatListRef}
-                data={messages}
-                keyExtractor={(_, i) => String(i)}
-                renderItem={renderMessage}
+                data={feedData}
+                keyExtractor={(item, i) => `${item.type}-${item.id || i}`}
+                renderItem={renderFeedItem}
                 contentContainerStyle={styles.messagesList}
                 onContentSizeChange={() => {
                     if (isInitialLoad.current || isNearBottom.current) {
@@ -269,6 +443,13 @@ export default function ChatRoomScreen({ route, navigation }) {
                 keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
             >
                 <View style={styles.inputBar}>
+                    <TouchableOpacity
+                        style={styles.pollButton}
+                        onPress={() => setPollModalVisible(true)}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.pollButtonText}>📊</Text>
+                    </TouchableOpacity>
                     <TextInput
                         style={styles.textInput}
                         placeholder="Type anonymously..."
@@ -468,6 +649,16 @@ const styles = StyleSheet.create({
         borderTopColor: "#1e1e35",
         backgroundColor: "#0f0f1a",
     },
+    pollButton: {
+        width: 40,
+        height: 44,
+        justifyContent: "center",
+        alignItems: "center",
+        marginRight: 4,
+    },
+    pollButtonText: {
+        fontSize: 22,
+    },
     textInput: {
         flex: 1,
         backgroundColor: "#1a1a2e",
@@ -503,5 +694,125 @@ const styles = StyleSheet.create({
         color: "#ffffff",
         fontSize: 18,
         fontWeight: "700",
+    },
+
+    // ── Poll Card (inline in chat) ──
+    pollCard: {
+        backgroundColor: "#1a1a2e",
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: "#6c63ff44",
+        alignSelf: "stretch",
+    },
+    pollLabel: {
+        color: "#6c63ff",
+        fontSize: 11,
+        fontWeight: "800",
+        letterSpacing: 1,
+        marginBottom: 6,
+    },
+    pollQuestion: {
+        color: "#ffffff",
+        fontSize: 15,
+        fontWeight: "700",
+        marginBottom: 12,
+        lineHeight: 21,
+    },
+    pollOptionBtn: {
+        position: "relative",
+        backgroundColor: "#0f0f1a",
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 11,
+        marginBottom: 6,
+        borderWidth: 1,
+        borderColor: "#2a2a44",
+        overflow: "hidden",
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
+    pollOptionFill: {
+        position: "absolute",
+        left: 0,
+        top: 0,
+        bottom: 0,
+        backgroundColor: "#6c63ff22",
+        borderRadius: 10,
+    },
+    pollOptionText: {
+        color: "#e0e0f0",
+        fontSize: 14,
+        zIndex: 1,
+    },
+    pollOptionVotes: {
+        color: "#8888aa",
+        fontSize: 12,
+        fontWeight: "600",
+        zIndex: 1,
+    },
+    pollMeta: {
+        color: "#555577",
+        fontSize: 11,
+        marginTop: 8,
+        textAlign: "right",
+    },
+
+    // ── Poll Creation Modal ──
+    pollModalCard: {
+        backgroundColor: "#1a1a2e",
+        borderRadius: 20,
+        padding: 24,
+        width: "88%",
+        maxHeight: "75%",
+        borderWidth: 1,
+        borderColor: "#2a2a44",
+    },
+    pollInput: {
+        backgroundColor: "#0f0f1a",
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 15,
+        color: "#ffffff",
+        borderWidth: 1,
+        borderColor: "#2a2a44",
+        marginBottom: 10,
+    },
+    pollOptionRow: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    pollRemoveBtn: {
+        marginLeft: 8,
+        marginBottom: 10,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: "#2a2a44",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    pollRemoveText: {
+        color: "#ff6666",
+        fontSize: 14,
+        fontWeight: "700",
+    },
+    pollAddOptionBtn: {
+        borderWidth: 1,
+        borderColor: "#6c63ff44",
+        borderStyle: "dashed",
+        borderRadius: 12,
+        paddingVertical: 10,
+        alignItems: "center",
+        marginBottom: 4,
+    },
+    pollAddOptionText: {
+        color: "#6c63ff",
+        fontSize: 14,
+        fontWeight: "600",
     },
 });
