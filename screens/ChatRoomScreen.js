@@ -26,6 +26,8 @@ export default function ChatRoomScreen({ route, navigation }) {
     const socketRef = useRef(null);
     const flatListRef = useRef(null);
     const typingTimeout = useRef(null);
+    const isNearBottom = useRef(true);
+    const isInitialLoad = useRef(true);
 
     const [messages, setMessages] = useState([]);
     const [members, setMembers] = useState([]);
@@ -60,6 +62,7 @@ export default function ChatRoomScreen({ route, navigation }) {
         });
 
         socket.on("chat-history", (history) => {
+            isInitialLoad.current = true;
             setMessages(history);
         });
 
@@ -231,9 +234,18 @@ export default function ChatRoomScreen({ route, navigation }) {
                 keyExtractor={(_, i) => String(i)}
                 renderItem={renderMessage}
                 contentContainerStyle={styles.messagesList}
-                onContentSizeChange={() =>
-                    flatListRef.current?.scrollToEnd({ animated: true })
-                }
+                onContentSizeChange={() => {
+                    if (isInitialLoad.current || isNearBottom.current) {
+                        flatListRef.current?.scrollToEnd({ animated: !isInitialLoad.current });
+                        isInitialLoad.current = false;
+                    }
+                }}
+                onScroll={(e) => {
+                    const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+                    const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+                    isNearBottom.current = distanceFromBottom < 100;
+                }}
+                scrollEventThrottle={100}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyEmoji}>🤫</Text>
