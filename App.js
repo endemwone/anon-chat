@@ -66,12 +66,12 @@ export default function App() {
 
   return (
     <NavigationContainer>
-      <StatusBar barStyle="light-content" backgroundColor="#0f0f1a" />
+      <StatusBar barStyle="light-content" backgroundColor="#000000" />
       <Stack.Navigator
         initialRouteName="Home"
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: "#0f0f1a" },
+          contentStyle: { backgroundColor: "#000000" },
           animation: "slide_from_right",
         }}
       >

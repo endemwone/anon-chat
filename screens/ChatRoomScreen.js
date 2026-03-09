@@ -410,84 +410,85 @@ export default function ChatRoomScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: "#0f0f1a" },
+    safe: { flex: 1, backgroundColor: "#000000" },
 
     // Header
-    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#1e1e35" },
-    backBtn: { color: "#6c63ff", fontSize: 15, fontWeight: "600" },
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#111111" },
+    backBtn: { color: "#FFFC00", fontSize: 15, fontWeight: "700" },
     headerCenter: { alignItems: "center" },
-    roomTitle: { color: "#ffffff", fontSize: 17, fontWeight: "700", letterSpacing: 0.5 },
-    membersBadge: { backgroundColor: "#1a1a2e", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: "#2a2a44" },
-    membersBadgeText: { color: "#aaaacc", fontSize: 13, fontWeight: "600" },
+    roomTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "800", letterSpacing: 0.5 },
+    membersBadge: { backgroundColor: "#FFFC00", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+    membersBadgeText: { color: "#000000", fontSize: 13, fontWeight: "800" },
 
     // Members Modal
-    modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" },
-    modalCard: { backgroundColor: "#1a1a2e", borderRadius: 20, padding: 24, width: "80%", maxHeight: "60%", borderWidth: 1, borderColor: "#2a2a44" },
-    modalTitle: { color: "#ffffff", fontSize: 18, fontWeight: "700", marginBottom: 16, textAlign: "center" },
+    modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.8)", justifyContent: "center", alignItems: "center" },
+    modalCard: { backgroundColor: "#111111", borderRadius: 20, padding: 24, width: "80%", maxHeight: "60%", borderWidth: 1, borderColor: "#2E2E2D" },
+    modalTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "800", marginBottom: 16, textAlign: "center" },
     memberRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8 },
-    memberAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#2a2a44", alignItems: "center", justifyContent: "center", marginRight: 12 },
-    memberAvatarText: { color: "#ffffff", fontSize: 14, fontWeight: "700" },
-    memberName: { color: "#ccccee", fontSize: 15 },
-    modalClose: { marginTop: 20, backgroundColor: "#6c63ff", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
-    modalCloseText: { color: "#ffffff", fontWeight: "700", fontSize: 15 },
+    memberAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#FFFC00", alignItems: "center", justifyContent: "center", marginRight: 12 },
+    memberAvatarText: { color: "#000000", fontSize: 14, fontWeight: "800" },
+    memberName: { color: "#FFFFFF", fontSize: 15, fontWeight: "600" },
+    modalClose: { marginTop: 20, backgroundColor: "#FFFC00", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
+    modalCloseText: { color: "#000000", fontWeight: "800", fontSize: 15 },
 
     // Messages
     messagesList: { paddingHorizontal: 16, paddingVertical: 12, flexGrow: 1 },
-    messageBubble: { backgroundColor: "#1a1a2e", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 10, borderWidth: 1, borderColor: "#2a2a44", alignSelf: "flex-start", maxWidth: "85%" },
-    messageText: { color: "#e0e0f0", fontSize: 15, lineHeight: 21 },
-    messageTime: { color: "#555577", fontSize: 11, marginTop: 6, textAlign: "right" },
+    messageBubble: { backgroundColor: "#111111", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 10, alignSelf: "flex-start", maxWidth: "85%", borderLeftWidth: 3, borderLeftColor: "#00CBFE" },
+    messageText: { color: "#FFFFFF", fontSize: 16, lineHeight: 21 },
+    messageTime: { color: "#777777", fontSize: 11, marginTop: 6, textAlign: "right" },
 
     // Reply preview inside message bubble
-    replyPreview: { backgroundColor: "#0f0f1a", borderLeftWidth: 3, borderLeftColor: "#6c63ff", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8 },
-    replyPreviewText: { color: "#8888aa", fontSize: 13, fontStyle: "italic" },
+    replyPreview: { backgroundColor: "#2E2E2D", borderLeftWidth: 3, borderLeftColor: "#FF0049", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8 },
+    replyPreviewText: { color: "#AAAAAA", fontSize: 13, fontStyle: "italic" },
 
     // Reply bar above input
-    replyBar: { flexDirection: "row", alignItems: "center", backgroundColor: "#1a1a2e", paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: "#2a2a44" },
+    replyBar: { flexDirection: "row", alignItems: "center", backgroundColor: "#111111", paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: "#2E2E2D" },
     replyBarContent: { flex: 1 },
-    replyBarLabel: { color: "#6c63ff", fontSize: 11, fontWeight: "700", marginBottom: 2 },
-    replyBarText: { color: "#aaaacc", fontSize: 13 },
-    replyBarClose: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#2a2a44", justifyContent: "center", alignItems: "center", marginLeft: 10 },
-    replyBarCloseText: { color: "#ff6666", fontSize: 12, fontWeight: "700" },
+    replyBarLabel: { color: "#FF0049", fontSize: 11, fontWeight: "800", marginBottom: 2 },
+    replyBarText: { color: "#FFFFFF", fontSize: 13 },
+    replyBarClose: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#2E2E2D", justifyContent: "center", alignItems: "center", marginLeft: 10 },
+    replyBarCloseText: { color: "#FF0049", fontSize: 12, fontWeight: "800" },
 
     // Load more
     loadingMore: { paddingVertical: 16, alignItems: "center" },
     loadMoreBtn: { paddingVertical: 12, alignItems: "center" },
-    loadMoreText: { color: "#6c63ff", fontSize: 13, fontWeight: "600" },
+    loadMoreText: { color: "#00CBFE", fontSize: 14, fontWeight: "700" },
 
     // Empty state
     emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 80 },
     emptyEmoji: { fontSize: 48, marginBottom: 12 },
-    emptyText: { color: "#555577", fontSize: 14, textAlign: "center", lineHeight: 22 },
+    emptyText: { color: "#777777", fontSize: 14, textAlign: "center", lineHeight: 22 },
 
     // Typing
     typingBar: { paddingHorizontal: 20, paddingVertical: 6 },
-    typingText: { color: "#6c63ff", fontSize: 13, fontStyle: "italic" },
+    typingText: { color: "#00CBFE", fontSize: 13, fontWeight: "600", fontStyle: "italic" },
 
     // Input bar
-    inputBar: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: "#1e1e35", backgroundColor: "#0f0f1a" },
+    inputBar: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: "#111111", backgroundColor: "#000000" },
     pollButton: { width: 40, height: 44, justifyContent: "center", alignItems: "center", marginRight: 4 },
     pollButtonText: { fontSize: 22 },
-    textInput: { flex: 1, backgroundColor: "#1a1a2e", borderRadius: 20, paddingHorizontal: 18, paddingVertical: 12, fontSize: 15, color: "#ffffff", maxHeight: 100, borderWidth: 1, borderColor: "#2a2a44" },
-    sendButton: { marginLeft: 10, backgroundColor: "#6c63ff", width: 44, height: 44, borderRadius: 22, justifyContent: "center", alignItems: "center", shadowColor: "#6c63ff", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.5, shadowRadius: 6, elevation: 4 },
-    sendButtonDisabled: { backgroundColor: "#2a2a44", shadowOpacity: 0, elevation: 0 },
-    sendButtonText: { color: "#ffffff", fontSize: 18, fontWeight: "700" },
+    textInput: { flex: 1, backgroundColor: "#111111", borderRadius: 22, paddingHorizontal: 18, paddingVertical: 12, fontSize: 16, color: "#FFFFFF", maxHeight: 100 },
+    sendButton: { marginLeft: 10, backgroundColor: "#00CBFE", width: 44, height: 44, borderRadius: 22, justifyContent: "center", alignItems: "center" },
+    sendButtonDisabled: { backgroundColor: "#2E2E2D" },
+    sendButtonText: { color: "#000000", fontSize: 20, fontWeight: "800" },
 
     // Poll card
-    pollCard: { backgroundColor: "#1a1a2e", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 10, borderWidth: 1, borderColor: "#6c63ff44", alignSelf: "stretch" },
-    pollLabel: { color: "#6c63ff", fontSize: 11, fontWeight: "800", letterSpacing: 1, marginBottom: 6 },
-    pollQuestion: { color: "#ffffff", fontSize: 15, fontWeight: "700", marginBottom: 12, lineHeight: 21 },
-    pollOptionBtn: { position: "relative", backgroundColor: "#0f0f1a", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 6, borderWidth: 1, borderColor: "#2a2a44", overflow: "hidden", flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-    pollOptionFill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: "#6c63ff22", borderRadius: 10 },
-    pollOptionText: { color: "#e0e0f0", fontSize: 14, zIndex: 1 },
-    pollOptionVotes: { color: "#8888aa", fontSize: 12, fontWeight: "600", zIndex: 1 },
-    pollMeta: { color: "#555577", fontSize: 11, marginTop: 8, textAlign: "right" },
+    pollCard: { backgroundColor: "#111111", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 10, alignSelf: "stretch", borderLeftWidth: 3, borderLeftColor: "#FFFC00" },
+    pollLabel: { color: "#FFFC00", fontSize: 11, fontWeight: "800", letterSpacing: 1, marginBottom: 6 },
+    pollQuestion: { color: "#FFFFFF", fontSize: 16, fontWeight: "800", marginBottom: 12, lineHeight: 21 },
+    pollOptionBtn: { position: "relative", backgroundColor: "#000000", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 6, overflow: "hidden", flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+    pollOptionFill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: "#FFFC0044", borderRadius: 10 },
+    pollOptionText: { color: "#FFFFFF", fontSize: 15, fontWeight: "600", zIndex: 1 },
+    pollOptionVotes: { color: "#AAAAAA", fontSize: 13, fontWeight: "700", zIndex: 1 },
+    pollMeta: { color: "#777777", fontSize: 11, marginTop: 8, textAlign: "right" },
 
     // Poll modal
-    pollModalCard: { backgroundColor: "#1a1a2e", borderRadius: 20, padding: 24, width: "88%", maxHeight: "75%", borderWidth: 1, borderColor: "#2a2a44" },
-    pollInput: { backgroundColor: "#0f0f1a", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: "#ffffff", borderWidth: 1, borderColor: "#2a2a44", marginBottom: 10 },
+    pollModalCard: { backgroundColor: "#111111", borderRadius: 20, padding: 24, width: "88%", maxHeight: "75%", borderWidth: 1, borderColor: "#2E2E2D" },
+    pollInput: { backgroundColor: "#000000", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, color: "#FFFFFF", marginBottom: 10 },
     pollOptionRow: { flexDirection: "row", alignItems: "center" },
-    pollRemoveBtn: { marginLeft: 8, marginBottom: 10, width: 32, height: 32, borderRadius: 16, backgroundColor: "#2a2a44", justifyContent: "center", alignItems: "center" },
-    pollRemoveText: { color: "#ff6666", fontSize: 14, fontWeight: "700" },
-    pollAddOptionBtn: { borderWidth: 1, borderColor: "#6c63ff44", borderStyle: "dashed", borderRadius: 12, paddingVertical: 10, alignItems: "center", marginBottom: 4 },
-    pollAddOptionText: { color: "#6c63ff", fontSize: 14, fontWeight: "600" },
+    pollRemoveBtn: { marginLeft: 8, marginBottom: 10, width: 32, height: 32, borderRadius: 16, backgroundColor: "#2E2E2D", justifyContent: "center", alignItems: "center" },
+    pollRemoveText: { color: "#FF0049", fontSize: 14, fontWeight: "800" },
+    pollAddOptionBtn: { borderWidth: 1, borderColor: "#FFFC00", borderStyle: "dashed", borderRadius: 12, paddingVertical: 10, alignItems: "center", marginBottom: 4 },
+    pollAddOptionText: { color: "#FFFC00", fontSize: 15, fontWeight: "700" },
 });
+
