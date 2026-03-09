@@ -335,9 +335,6 @@ export default function ChatRoomScreen({ route, navigation }) {
                 keyExtractor={(item, i) => `${item.type}-${item.id || i}`}
                 renderItem={renderFeedItem}
                 contentContainerStyle={styles.messagesList}
-                onContentSizeChange={() =>
-                    flatListRef.current?.scrollToEnd({ animated: true })
-                }
 
                 scrollEventThrottle={100}
                 onStartReached={loadOlderMessages}
