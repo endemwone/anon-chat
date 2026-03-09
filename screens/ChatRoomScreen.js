@@ -210,19 +210,22 @@ export default function ChatRoomScreen({ route, navigation }) {
     // ── Render poll card ──
     const renderPollCard = (item) => (
         <View style={styles.pollCard}>
-            <Text style={styles.pollLabel}>📊 POLL</Text>
+            <View style={styles.pollHeader}>
+                <Text style={styles.pollLabel}>📊 POLL</Text>
+                <Text style={styles.pollMeta}>{item.totalVotes} vote{item.totalVotes !== 1 ? "s" : ""}</Text>
+            </View>
             <Text style={styles.pollQuestion}>{item.question}</Text>
             {item.options.map((opt, i) => {
                 const pct = item.totalVotes > 0 ? Math.round((item.votes[i] / item.totalVotes) * 100) : 0;
                 return (
-                    <TouchableOpacity key={i} style={styles.pollOptionBtn} onPress={() => voteOnPoll(item.id, i)} activeOpacity={0.7}>
+                    <TouchableOpacity key={i} style={styles.pollOptionBtn} onPress={() => voteOnPoll(item.id, i)} activeOpacity={0.6}>
                         <View style={[styles.pollOptionFill, { width: `${pct}%` }]} />
                         <Text style={styles.pollOptionText}>{opt}</Text>
-                        <Text style={styles.pollOptionVotes}>{item.votes[i]} ({pct}%)</Text>
+                        <Text style={styles.pollOptionPct}>{pct}%</Text>
                     </TouchableOpacity>
                 );
             })}
-            <Text style={styles.pollMeta}>{item.totalVotes} vote{item.totalVotes !== 1 ? "s" : ""} · {formatTime(item.createdAt)}</Text>
+            <Text style={styles.pollTime}>{formatTime(item.createdAt)}</Text>
         </View>
     );
 
@@ -231,20 +234,22 @@ export default function ChatRoomScreen({ route, navigation }) {
         if (item.type === "poll") return renderPollCard(item);
         return (
             <TouchableOpacity
-                activeOpacity={0.8}
+                activeOpacity={0.7}
                 onLongPress={() => setReplyingTo(item)}
-                delayLongPress={400}
+                delayLongPress={300}
             >
-                <View style={styles.messageBubble}>
+                <View style={styles.msgRow}>
+                    {/* Reply quote */}
                     {item.replyTo && (
-                        <View style={styles.replyPreview}>
-                            <Text style={styles.replyPreviewText} numberOfLines={2}>
+                        <View style={styles.replyQuote}>
+                            <View style={styles.replyLine} />
+                            <Text style={styles.replyQuoteText} numberOfLines={1}>
                                 {item.replyTo.text}
                             </Text>
                         </View>
                     )}
-                    <Text style={styles.messageText}>{item.text}</Text>
-                    <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
+                    <Text style={styles.msgText}>{item.text}</Text>
+                    <Text style={styles.msgTime}>{formatTime(item.timestamp)}</Text>
                 </View>
             </TouchableOpacity>
         );
@@ -254,87 +259,91 @@ export default function ChatRoomScreen({ route, navigation }) {
 
     return (
         <SafeAreaView style={styles.safe}>
-            {/* Header */}
+            {/* ── Snapchat-style Header ── */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
-                    <Text style={styles.backBtn}>← Back</Text>
+                <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.6} style={styles.headerBtn}>
+                    <Text style={styles.backArrow}>‹</Text>
                 </TouchableOpacity>
-                <View style={styles.headerCenter}>
-                    <Text style={styles.roomTitle}>🔒 {roomCode}</Text>
-                </View>
-                <TouchableOpacity onPress={() => setMembersVisible(true)} activeOpacity={0.7}>
-                    <View style={styles.membersBadge}>
-                        <Text style={styles.membersBadgeText}>👥 {members.length}</Text>
+                <TouchableOpacity onPress={() => setMembersVisible(true)} activeOpacity={0.6} style={styles.headerCenter}>
+                    <View style={styles.headerAvatar}>
+                        <Text style={{ fontSize: 16 }}>👻</Text>
                     </View>
+                    <View>
+                        <Text style={styles.headerName}>{roomCode}</Text>
+                        <Text style={styles.headerSub}>{members.length} member{members.length !== 1 ? "s" : ""}</Text>
+                    </View>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setPollModalVisible(true)} activeOpacity={0.6} style={styles.headerBtn}>
+                    <Text style={{ fontSize: 20 }}>📊</Text>
                 </TouchableOpacity>
             </View>
 
-            {/* Members Modal */}
+            {/* ── Members Modal ── */}
             <Modal visible={membersVisible} transparent animationType="fade" onRequestClose={() => setMembersVisible(false)}>
-                <Pressable style={styles.modalOverlay} onPress={() => setMembersVisible(false)}>
-                    <View style={styles.modalCard}>
-                        <Text style={styles.modalTitle}>Members</Text>
+                <Pressable style={styles.overlay} onPress={() => setMembersVisible(false)}>
+                    <View style={styles.membersCard}>
+                        <View style={styles.membersHandle} />
+                        <Text style={styles.membersTitle}>Members</Text>
                         {members.map((name, i) => (
                             <View key={i} style={styles.memberRow}>
-                                <View style={styles.memberAvatar}>
-                                    <Text style={styles.memberAvatarText}>{name.charAt(0).toUpperCase()}</Text>
-                                </View>
+                                <View style={styles.memberDot} />
                                 <Text style={styles.memberName}>{name}</Text>
                             </View>
                         ))}
-                        <TouchableOpacity style={styles.modalClose} onPress={() => setMembersVisible(false)}>
-                            <Text style={styles.modalCloseText}>Close</Text>
+                        <TouchableOpacity style={styles.membersDone} onPress={() => setMembersVisible(false)}>
+                            <Text style={styles.membersDoneText}>Done</Text>
                         </TouchableOpacity>
                     </View>
                 </Pressable>
             </Modal>
 
-            {/* Poll Creation Modal */}
+            {/* ── Poll Creation Modal ── */}
             <Modal visible={pollModalVisible} transparent animationType="slide" onRequestClose={() => setPollModalVisible(false)}>
-                <Pressable style={styles.modalOverlay} onPress={() => setPollModalVisible(false)}>
-                    <Pressable style={styles.pollModalCard} onPress={() => { }}>
-                        <Text style={styles.modalTitle}>📊 Create Poll</Text>
-                        <TextInput style={styles.pollInput} placeholder="Ask a question..." placeholderTextColor="#555" value={pollQuestion} onChangeText={setPollQuestion} maxLength={200} />
+                <Pressable style={styles.overlay} onPress={() => setPollModalVisible(false)}>
+                    <Pressable style={styles.pollModal} onPress={() => { }}>
+                        <View style={styles.membersHandle} />
+                        <Text style={styles.membersTitle}>Create Poll</Text>
+                        <TextInput style={styles.pollInput} placeholder="Ask a question..." placeholderTextColor="#666" value={pollQuestion} onChangeText={setPollQuestion} maxLength={200} />
                         {pollOptions.map((opt, i) => (
-                            <View key={i} style={styles.pollOptionRow}>
+                            <View key={i} style={styles.pollOptRow}>
                                 <TextInput
                                     style={[styles.pollInput, { flex: 1 }]}
                                     placeholder={`Option ${i + 1}`}
-                                    placeholderTextColor="#555"
+                                    placeholderTextColor="#666"
                                     value={opt}
                                     onChangeText={(t) => { const c = [...pollOptions]; c[i] = t; setPollOptions(c); }}
                                     maxLength={100}
                                 />
                                 {pollOptions.length > 2 && (
-                                    <TouchableOpacity onPress={() => removePollOption(i)} style={styles.pollRemoveBtn}>
-                                        <Text style={styles.pollRemoveText}>✕</Text>
+                                    <TouchableOpacity onPress={() => removePollOption(i)} style={styles.pollOptRemove}>
+                                        <Text style={styles.pollOptRemoveText}>✕</Text>
                                     </TouchableOpacity>
                                 )}
                             </View>
                         ))}
                         {pollOptions.length < 10 && (
-                            <TouchableOpacity style={styles.pollAddOptionBtn} onPress={addPollOption}>
-                                <Text style={styles.pollAddOptionText}>+ Add Option</Text>
+                            <TouchableOpacity style={styles.pollAddBtn} onPress={addPollOption}>
+                                <Text style={styles.pollAddText}>+ Add Option</Text>
                             </TouchableOpacity>
                         )}
                         <TouchableOpacity
-                            style={[styles.modalClose, (!pollQuestion.trim() || pollOptions.filter((o) => o.trim()).length < 2) && styles.sendButtonDisabled]}
+                            style={[styles.pollSubmitBtn, (!pollQuestion.trim() || pollOptions.filter((o) => o.trim()).length < 2) && { opacity: 0.4 }]}
                             onPress={submitPoll}
                             disabled={!pollQuestion.trim() || pollOptions.filter((o) => o.trim()).length < 2}
                         >
-                            <Text style={styles.modalCloseText}>Create Poll</Text>
+                            <Text style={styles.pollSubmitText}>Create Poll</Text>
                         </TouchableOpacity>
                     </Pressable>
                 </Pressable>
             </Modal>
 
-            {/* Feed */}
+            {/* ── Message Feed ── */}
             <FlatList
                 ref={flatListRef}
                 data={feedData}
                 keyExtractor={(item, i) => `${item.type}-${item.id || i}`}
                 renderItem={renderFeedItem}
-                contentContainerStyle={styles.messagesList}
+                contentContainerStyle={styles.feed}
                 inverted
                 scrollEventThrottle={100}
                 onEndReached={loadOlderMessages}
@@ -342,52 +351,50 @@ export default function ChatRoomScreen({ route, navigation }) {
                 ListFooterComponent={
                     loadingOlder ? (
                         <View style={styles.loadingMore}>
-                            <ActivityIndicator color="#6c63ff" size="small" />
+                            <ActivityIndicator color="#FFFC00" size="small" />
                         </View>
                     ) : hasMoreMessages && messages.length > 0 ? (
                         <TouchableOpacity style={styles.loadMoreBtn} onPress={loadOlderMessages}>
-                            <Text style={styles.loadMoreText}>↑ Load older messages</Text>
+                            <Text style={styles.loadMoreText}>Load more ↑</Text>
                         </TouchableOpacity>
                     ) : null
                 }
                 ListEmptyComponent={
                     <View style={[styles.emptyContainer, { transform: [{ scaleY: -1 }] }]}>
-                        <Text style={styles.emptyEmoji}>🤫</Text>
-                        <Text style={styles.emptyText}>No messages yet.{"\n"}Be the first to say something anonymous!</Text>
+                        <Text style={styles.emptyGhost}>👻</Text>
+                        <Text style={styles.emptyText}>Say something anonymous!</Text>
                     </View>
                 }
             />
 
-            {/* Typing indicator */}
+            {/* ── Typing indicator ── */}
             {isTyping && (
                 <View style={styles.typingBar}>
-                    <Text style={styles.typingText}>someone is typing...</Text>
+                    <Text style={styles.typingText}>typing...</Text>
                 </View>
             )}
 
-            {/* Reply preview bar */}
+            {/* ── Reply bar ── */}
             {replyingTo && (
                 <View style={styles.replyBar}>
+                    <View style={styles.replyBarLine} />
                     <View style={styles.replyBarContent}>
-                        <Text style={styles.replyBarLabel}>Replying to</Text>
-                        <Text style={styles.replyBarText} numberOfLines={1}>{replyingTo.text}</Text>
+                        <Text style={styles.replyBarLabel}>Reply</Text>
+                        <Text style={styles.replyBarMsg} numberOfLines={1}>{replyingTo.text}</Text>
                     </View>
-                    <TouchableOpacity onPress={() => setReplyingTo(null)} style={styles.replyBarClose}>
-                        <Text style={styles.replyBarCloseText}>✕</Text>
+                    <TouchableOpacity onPress={() => setReplyingTo(null)} style={styles.replyBarX}>
+                        <Text style={styles.replyBarXText}>✕</Text>
                     </TouchableOpacity>
                 </View>
             )}
 
-            {/* Input bar */}
+            {/* ── Input bar ── */}
             <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}>
                 <View style={styles.inputBar}>
-                    <TouchableOpacity style={styles.pollButton} onPress={() => setPollModalVisible(true)} activeOpacity={0.7}>
-                        <Text style={styles.pollButtonText}>📊</Text>
-                    </TouchableOpacity>
                     <TextInput
                         style={styles.textInput}
-                        placeholder="Type anonymously..."
-                        placeholderTextColor="#555"
+                        placeholder="Send a chat"
+                        placeholderTextColor="#666"
                         value={inputText}
                         onChangeText={handleTextChange}
                         multiline
@@ -396,12 +403,12 @@ export default function ChatRoomScreen({ route, navigation }) {
                         blurOnSubmit={false}
                     />
                     <TouchableOpacity
-                        style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+                        style={[styles.sendBtn, !inputText.trim() && styles.sendBtnOff]}
                         onPress={sendMessage}
                         activeOpacity={0.7}
                         disabled={!inputText.trim()}
                     >
-                        <Text style={styles.sendButtonText}>▲</Text>
+                        <Text style={styles.sendBtnText}>➤</Text>
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
@@ -412,83 +419,152 @@ export default function ChatRoomScreen({ route, navigation }) {
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: "#000000" },
 
-    // Header
-    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#111111" },
-    backBtn: { color: "#FFFC00", fontSize: 15, fontWeight: "700" },
-    headerCenter: { alignItems: "center" },
-    roomTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "800", letterSpacing: 0.5 },
-    membersBadge: { backgroundColor: "#FFFC00", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-    membersBadgeText: { color: "#000000", fontSize: 13, fontWeight: "800" },
+    // ── Header ──
+    header: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 8,
+        paddingVertical: 10,
+        borderBottomWidth: 0.5,
+        borderBottomColor: "#222",
+    },
+    headerBtn: { width: 44, height: 44, justifyContent: "center", alignItems: "center" },
+    backArrow: { color: "#FFFC00", fontSize: 36, fontWeight: "300", marginTop: -4 },
+    headerCenter: { flex: 1, flexDirection: "row", alignItems: "center" },
+    headerAvatar: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: "#FFFC00",
+        justifyContent: "center",
+        alignItems: "center",
+        marginRight: 10,
+    },
+    headerName: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
+    headerSub: { color: "#888", fontSize: 12 },
 
-    // Members Modal
-    modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.8)", justifyContent: "center", alignItems: "center" },
-    modalCard: { backgroundColor: "#111111", borderRadius: 20, padding: 24, width: "80%", maxHeight: "60%", borderWidth: 1, borderColor: "#2E2E2D" },
-    modalTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "800", marginBottom: 16, textAlign: "center" },
-    memberRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8 },
-    memberAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#FFFC00", alignItems: "center", justifyContent: "center", marginRight: 12 },
-    memberAvatarText: { color: "#000000", fontSize: 14, fontWeight: "800" },
-    memberName: { color: "#FFFFFF", fontSize: 15, fontWeight: "600" },
-    modalClose: { marginTop: 20, backgroundColor: "#FFFC00", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
-    modalCloseText: { color: "#000000", fontWeight: "800", fontSize: 15 },
+    // ── Overlay / Modals ──
+    overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", alignItems: "center" },
+    membersCard: { backgroundColor: "#111", borderRadius: 12, padding: 20, width: "80%", maxHeight: "60%" },
+    membersHandle: { width: 32, height: 4, borderRadius: 2, backgroundColor: "#333", alignSelf: "center", marginBottom: 16 },
+    membersTitle: { color: "#FFF", fontSize: 17, fontWeight: "800", textAlign: "center", marginBottom: 16 },
+    memberRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10 },
+    memberDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FFFC00", marginRight: 12 },
+    memberName: { color: "#FFF", fontSize: 15, fontWeight: "600" },
+    membersDone: { marginTop: 16, backgroundColor: "#FFFC00", borderRadius: 20, paddingVertical: 10, alignItems: "center" },
+    membersDoneText: { color: "#000", fontWeight: "800", fontSize: 14 },
 
-    // Messages
-    messagesList: { paddingHorizontal: 16, paddingVertical: 12, flexGrow: 1 },
-    messageBubble: { backgroundColor: "#111111", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 10, alignSelf: "flex-start", maxWidth: "85%", borderLeftWidth: 3, borderLeftColor: "#00CBFE" },
-    messageText: { color: "#FFFFFF", fontSize: 16, lineHeight: 21 },
-    messageTime: { color: "#777777", fontSize: 11, marginTop: 6, textAlign: "right" },
+    // ── Poll Modal ──
+    pollModal: { backgroundColor: "#111", borderRadius: 12, padding: 20, width: "88%", maxHeight: "75%" },
+    pollInput: { backgroundColor: "#1A1A1A", borderRadius: 4, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: "#FFF", marginBottom: 8 },
+    pollOptRow: { flexDirection: "row", alignItems: "center" },
+    pollOptRemove: { marginLeft: 8, marginBottom: 8, width: 30, height: 30, borderRadius: 15, backgroundColor: "#222", justifyContent: "center", alignItems: "center" },
+    pollOptRemoveText: { color: "#FF3B30", fontSize: 13, fontWeight: "800" },
+    pollAddBtn: { borderWidth: 1, borderColor: "#FFFC00", borderStyle: "dashed", borderRadius: 4, paddingVertical: 10, alignItems: "center", marginBottom: 8 },
+    pollAddText: { color: "#FFFC00", fontSize: 14, fontWeight: "700" },
+    pollSubmitBtn: { backgroundColor: "#FFFC00", borderRadius: 20, paddingVertical: 12, alignItems: "center", marginTop: 8 },
+    pollSubmitText: { color: "#000", fontWeight: "800", fontSize: 15 },
 
-    // Reply preview inside message bubble
-    replyPreview: { backgroundColor: "#2E2E2D", borderLeftWidth: 3, borderLeftColor: "#FF0049", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8 },
-    replyPreviewText: { color: "#AAAAAA", fontSize: 13, fontStyle: "italic" },
+    // ── Feed ──
+    feed: { paddingHorizontal: 16, paddingVertical: 8, flexGrow: 1 },
 
-    // Reply bar above input
-    replyBar: { flexDirection: "row", alignItems: "center", backgroundColor: "#111111", paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: "#2E2E2D" },
+    // ── Messages (FLAT like Snapchat) ──
+    msgRow: {
+        backgroundColor: "#111111",
+        borderRadius: 2,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        marginBottom: 2,
+        alignSelf: "stretch",
+    },
+    msgText: { color: "#FFFFFF", fontSize: 15, lineHeight: 20 },
+    msgTime: { color: "#555", fontSize: 10, marginTop: 4 },
+
+    // ── Reply quote inside message ──
+    replyQuote: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
+    replyLine: { width: 2, height: "100%", backgroundColor: "#FFFC00", marginRight: 8, borderRadius: 1, minHeight: 14 },
+    replyQuoteText: { color: "#888", fontSize: 13, flex: 1 },
+
+    // ── Reply bar above input ──
+    replyBar: { flexDirection: "row", alignItems: "center", backgroundColor: "#111", paddingHorizontal: 14, paddingVertical: 8 },
+    replyBarLine: { width: 3, height: 28, backgroundColor: "#FFFC00", borderRadius: 1.5, marginRight: 10 },
     replyBarContent: { flex: 1 },
-    replyBarLabel: { color: "#FF0049", fontSize: 11, fontWeight: "800", marginBottom: 2 },
-    replyBarText: { color: "#FFFFFF", fontSize: 13 },
-    replyBarClose: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#2E2E2D", justifyContent: "center", alignItems: "center", marginLeft: 10 },
-    replyBarCloseText: { color: "#FF0049", fontSize: 12, fontWeight: "800" },
+    replyBarLabel: { color: "#FFFC00", fontSize: 11, fontWeight: "800", marginBottom: 1 },
+    replyBarMsg: { color: "#CCC", fontSize: 13 },
+    replyBarX: { width: 26, height: 26, borderRadius: 13, backgroundColor: "#222", justifyContent: "center", alignItems: "center", marginLeft: 8 },
+    replyBarXText: { color: "#FF3B30", fontSize: 11, fontWeight: "800" },
 
-    // Load more
+    // ── Load more ──
     loadingMore: { paddingVertical: 16, alignItems: "center" },
-    loadMoreBtn: { paddingVertical: 12, alignItems: "center" },
-    loadMoreText: { color: "#00CBFE", fontSize: 14, fontWeight: "700" },
+    loadMoreBtn: { paddingVertical: 14, alignItems: "center" },
+    loadMoreText: { color: "#FFFC00", fontSize: 13, fontWeight: "700" },
 
-    // Empty state
-    emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 80 },
-    emptyEmoji: { fontSize: 48, marginBottom: 12 },
-    emptyText: { color: "#777777", fontSize: 14, textAlign: "center", lineHeight: 22 },
+    // ── Empty ──
+    emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 100 },
+    emptyGhost: { fontSize: 48, marginBottom: 8 },
+    emptyText: { color: "#666", fontSize: 14 },
 
-    // Typing
-    typingBar: { paddingHorizontal: 20, paddingVertical: 6 },
-    typingText: { color: "#00CBFE", fontSize: 13, fontWeight: "600", fontStyle: "italic" },
+    // ── Typing ──
+    typingBar: { paddingHorizontal: 20, paddingVertical: 4 },
+    typingText: { color: "#888", fontSize: 12, fontStyle: "italic" },
 
-    // Input bar
-    inputBar: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: "#111111", backgroundColor: "#000000" },
-    pollButton: { width: 40, height: 44, justifyContent: "center", alignItems: "center", marginRight: 4 },
-    pollButtonText: { fontSize: 22 },
-    textInput: { flex: 1, backgroundColor: "#111111", borderRadius: 22, paddingHorizontal: 18, paddingVertical: 12, fontSize: 16, color: "#FFFFFF", maxHeight: 100 },
-    sendButton: { marginLeft: 10, backgroundColor: "#00CBFE", width: 44, height: 44, borderRadius: 22, justifyContent: "center", alignItems: "center" },
-    sendButtonDisabled: { backgroundColor: "#2E2E2D" },
-    sendButtonText: { color: "#000000", fontSize: 20, fontWeight: "800" },
+    // ── Input bar ──
+    inputBar: {
+        flexDirection: "row",
+        alignItems: "flex-end",
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        backgroundColor: "#000",
+    },
+    textInput: {
+        flex: 1,
+        backgroundColor: "#1A1A1A",
+        borderRadius: 20,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        fontSize: 16,
+        color: "#FFF",
+        maxHeight: 100,
+    },
+    sendBtn: {
+        marginLeft: 8,
+        backgroundColor: "#00CBFE",
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    sendBtnOff: { backgroundColor: "#222" },
+    sendBtnText: { color: "#000", fontSize: 18, fontWeight: "700" },
 
-    // Poll card
-    pollCard: { backgroundColor: "#111111", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 10, alignSelf: "stretch", borderLeftWidth: 3, borderLeftColor: "#FFFC00" },
-    pollLabel: { color: "#FFFC00", fontSize: 11, fontWeight: "800", letterSpacing: 1, marginBottom: 6 },
-    pollQuestion: { color: "#FFFFFF", fontSize: 16, fontWeight: "800", marginBottom: 12, lineHeight: 21 },
-    pollOptionBtn: { position: "relative", backgroundColor: "#000000", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 6, overflow: "hidden", flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-    pollOptionFill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: "#FFFC0044", borderRadius: 10 },
-    pollOptionText: { color: "#FFFFFF", fontSize: 15, fontWeight: "600", zIndex: 1 },
-    pollOptionVotes: { color: "#AAAAAA", fontSize: 13, fontWeight: "700", zIndex: 1 },
-    pollMeta: { color: "#777777", fontSize: 11, marginTop: 8, textAlign: "right" },
-
-    // Poll modal
-    pollModalCard: { backgroundColor: "#111111", borderRadius: 20, padding: 24, width: "88%", maxHeight: "75%", borderWidth: 1, borderColor: "#2E2E2D" },
-    pollInput: { backgroundColor: "#000000", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, color: "#FFFFFF", marginBottom: 10 },
-    pollOptionRow: { flexDirection: "row", alignItems: "center" },
-    pollRemoveBtn: { marginLeft: 8, marginBottom: 10, width: 32, height: 32, borderRadius: 16, backgroundColor: "#2E2E2D", justifyContent: "center", alignItems: "center" },
-    pollRemoveText: { color: "#FF0049", fontSize: 14, fontWeight: "800" },
-    pollAddOptionBtn: { borderWidth: 1, borderColor: "#FFFC00", borderStyle: "dashed", borderRadius: 12, paddingVertical: 10, alignItems: "center", marginBottom: 4 },
-    pollAddOptionText: { color: "#FFFC00", fontSize: 15, fontWeight: "700" },
+    // ── Poll card in feed ──
+    pollCard: {
+        backgroundColor: "#111",
+        borderRadius: 2,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        marginBottom: 2,
+        alignSelf: "stretch",
+    },
+    pollHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
+    pollLabel: { color: "#FFFC00", fontSize: 11, fontWeight: "800", letterSpacing: 1 },
+    pollMeta: { color: "#666", fontSize: 11 },
+    pollQuestion: { color: "#FFF", fontSize: 15, fontWeight: "700", marginBottom: 10 },
+    pollOptionBtn: {
+        position: "relative",
+        backgroundColor: "#1A1A1A",
+        borderRadius: 2,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 4,
+        overflow: "hidden",
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
+    pollOptionFill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: "#FFFC0030", borderRadius: 2 },
+    pollOptionText: { color: "#FFF", fontSize: 14, fontWeight: "600", zIndex: 1 },
+    pollOptionPct: { color: "#AAA", fontSize: 12, fontWeight: "700", zIndex: 1 },
+    pollTime: { color: "#555", fontSize: 10, marginTop: 6, textAlign: "right" },
 });
-
