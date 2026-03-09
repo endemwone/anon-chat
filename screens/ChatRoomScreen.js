@@ -198,7 +198,7 @@ export default function ChatRoomScreen({ route, navigation }) {
         const feed = [];
         messages.forEach((m) => feed.push({ type: "message", ...m }));
         polls.forEach((p) => feed.push({ type: "poll", ...p, timestamp: p.createdAt }));
-        feed.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        feed.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         return feed;
     };
 
@@ -335,11 +335,11 @@ export default function ChatRoomScreen({ route, navigation }) {
                 keyExtractor={(item, i) => `${item.type}-${item.id || i}`}
                 renderItem={renderFeedItem}
                 contentContainerStyle={styles.messagesList}
-
+                inverted
                 scrollEventThrottle={100}
-                onStartReached={loadOlderMessages}
-                onStartReachedThreshold={0.1}
-                ListHeaderComponent={
+                onEndReached={loadOlderMessages}
+                onEndReachedThreshold={0.1}
+                ListFooterComponent={
                     loadingOlder ? (
                         <View style={styles.loadingMore}>
                             <ActivityIndicator color="#6c63ff" size="small" />
@@ -351,7 +351,7 @@ export default function ChatRoomScreen({ route, navigation }) {
                     ) : null
                 }
                 ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
+                    <View style={[styles.emptyContainer, { transform: [{ scaleY: -1 }] }]}>
                         <Text style={styles.emptyEmoji}>🤫</Text>
                         <Text style={styles.emptyText}>No messages yet.{"\n"}Be the first to say something anonymous!</Text>
                     </View>
